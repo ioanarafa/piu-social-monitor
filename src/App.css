@@ -20,7 +20,7 @@ body {
   margin-top: 0;
 }
 
-.sidebar button {
+.navBtn {
   width: 100%;
   margin-bottom: 8px;
   padding: 8px;
@@ -30,8 +30,14 @@ body {
   cursor: pointer;
 }
 
-.sidebar button:hover {
+.navBtn:hover {
   background: #1abc9c;
+}
+
+/* BUTON ACTIV (pagina curenta) */
+.navBtn.active {
+  background: #16c39a;
+  font-weight: 700;
 }
 
 /* CONTINUT */
@@ -64,4 +70,44 @@ input, textarea, select {
   width: 100%;
   margin-bottom: 10px;
   padding: 6px;
+}
+
+/* TOAST (feedback) */
+.toast {
+  padding: 12px 14px;
+  border-radius: 8px;
+  margin-bottom: 14px;
+  font-weight: 600;
+}
+
+.toast.success {
+  background: #e8fff5;
+  border: 1px solid #4bd6a4;
+  color: #0f5132;
+}
+
+.toast.error {
+  background: #ffecec;
+  border: 1px solid #ff6b6b;
+  color: #842029;
+}
+
+.roleBox {
+  margin-bottom: 14px;
+}
+
+.roleLabel {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 6px;
+  opacity: 0.9;
+}
+
+.roleSelect {
+  width: 100%;
+  padding: 8px;
+  border: none;
+  border-radius: 6px;
+  background: #34495e;
+  color: white;
 }
