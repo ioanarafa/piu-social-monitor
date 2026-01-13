@@ -66,7 +66,7 @@ function App() {
   return (
     <div className="app">
       <div className="sidebar">
-        <h2>PIU</h2>
+        <h2>Social Monitor</h2>
 
         <label className="smallLabel">Rol</label>
         <select value={role} onChange={(e) => setRole(e.target.value)}>
