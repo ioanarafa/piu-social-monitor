@@ -1,87 +1,141 @@
 import { useEffect, useState } from "react";
-import { API } from "../api";
+import { apiGet, apiSend } from "../api";
 
-export default function Evaluare({ showToast }) {
-  const [beneficiar, setBeneficiar] = useState("Pop Maria");
-  const [scor, setScor] = useState("1");
+export default function Evaluare({ showToast, role, selectedVoluntarId }) {
+  const [beneficiari, setBeneficiari] = useState([]);
+  const [voluntari, setVoluntari] = useState([]);
+
+  const [scor, setScor] = useState(8);
   const [observatii, setObservatii] = useState("");
-  const [list, setList] = useState([]);
 
-  async function load() {
+  const [targetId, setTargetId] = useState(""); 
+  const [items, setItems] = useState([]);
+
+  async function loadLists() {
+    const b = await apiGet("/beneficiari");
+    setBeneficiari(b);
+
+    const v = await apiGet("/voluntari");
+    setVoluntari(v);
+
+    if (role === "admin" && v.length && !targetId) setTargetId(v[0].id);
+    if (role === "voluntar" && b.length && !targetId) setTargetId(b[0].id);
+  }
+
+  async function loadEvaluari() {
+    if (role === "admin") {
+      setItems(await apiGet("/evaluari/voluntari"));
+    } else {
+      const path = selectedVoluntarId
+        ? `/evaluari/beneficiari?voluntarId=${selectedVoluntarId}`
+        : "/evaluari/beneficiari";
+      setItems(await apiGet(path));
+    }
+  }
+
+  async function loadAll() {
     try {
-      const res = await fetch(`${API}/evaluari`);
-      const data = await res.json();
-      setList(data);
+      await loadLists();
+      await loadEvaluari();
     } catch {
       showToast("Eroare: nu pot incarca evaluarile.", "error");
     }
   }
 
-  async function save() {
-    if (!beneficiar.trim() || !scor) {
-      showToast("Completeaza beneficiar si scor!", "error");
-      return;
-    }
+  useEffect(() => {
+    loadAll();
+  }, [role, selectedVoluntarId]);
 
+  async function send() {
     try {
-      const res = await fetch(`${API}/evaluari`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ beneficiar, scor, observatii }),
-      });
-
-      if (!res.ok) {
-        showToast("Eroare la salvare evaluare.", "error");
-        return;
+      if (role === "admin") {
+        await apiSend("/evaluari/voluntari", "POST", {
+          voluntarId: Number(targetId),
+          scor: Number(scor),
+          observatii,
+        });
+      } else {
+        await apiSend("/evaluari/beneficiari", "POST", {
+          beneficiarId: Number(targetId),
+          voluntarId: Number(selectedVoluntarId),
+          scor: Number(scor),
+          observatii,
+        });
       }
 
-      showToast("Evaluare salvata!", "success");
       setObservatii("");
-      load();
+      showToast("Evaluare salvata!");
+      loadEvaluari();
     } catch {
-      showToast("Eroare: backend indisponibil.", "error");
+      showToast("Eroare la salvare evaluare.", "error");
     }
   }
 
-  useEffect(() => {
-    load();
-  }, []);
-
   return (
-    <>
-      <h1>Evaluare progres beneficiar</h1>
+    <div>
+      <h1>Evaluare progres</h1>
 
       <div className="card">
-        <label>Beneficiar</label>
-        <input value={beneficiar} onChange={(e) => setBeneficiar(e.target.value)} />
+        {role === "admin" ? (
+          <>
+            <h3>Admin evalueaza voluntari</h3>
+            <label>Voluntar</label>
+            <select value={targetId} onChange={(e) => setTargetId(e.target.value)}>
+              {voluntari.map((v) => (
+                <option key={v.id} value={v.id}>{v.nume}</option>
+              ))}
+            </select>
+          </>
+        ) : (
+          <>
+            <h3>Voluntar evalueaza beneficiari</h3>
+            <label>Beneficiar</label>
+            <select value={targetId} onChange={(e) => setTargetId(e.target.value)}>
+              {beneficiari.map((b) => (
+                <option key={b.id} value={b.id}>{b.nume}</option>
+              ))}
+            </select>
+          </>
+        )}
 
-        <label>Scor</label>
-        <select value={scor} onChange={(e) => setScor(e.target.value)}>
-          <option value="1">1 - Foarte slab</option>
-          <option value="2">2</option>
-          <option value="3">3</option>
-          <option value="4">4</option>
-          <option value="5">5 - Foarte bun</option>
-        </select>
+        <label>Scor (1-10)</label>
+        <input
+          type="number"
+          min="1"
+          max="10"
+          value={scor}
+          onChange={(e) => setScor(e.target.value)}
+        />
 
-        <label>Observatii</label>
+        <label>Observatii (optional)</label>
         <textarea value={observatii} onChange={(e) => setObservatii(e.target.value)} />
 
-        <button className="button" onClick={save}>
-          Salveaza
-        </button>
+        <button className="button" onClick={send}>Trimite evaluare</button>
       </div>
 
       <div className="list">
-      {list.map((e) => (
-        <div key={e.id} className="card">
-          <p>
-            <b>{e.beneficiar}</b> | scor: {e.scor}
-          </p>
-          <p>{e.observatii}</p>
-        </div>
-      ))}
+        {items.map((x) => (
+          <div className="card" key={x.id}>
+            {role === "admin" ? (
+              <>
+                <h3>{x.voluntar}</h3>
+                <div>Scor: {x.scor}</div>
+                {x.observatii && <div>Obs: {x.observatii}</div>}
+                <div style={{ opacity: 0.8 }}>{x.createdAt}</div>
+              </>
+            ) : (
+              <>
+                <h3>{x.beneficiar}</h3>
+                <div>Scor: {x.scor}</div>
+                {x.observatii && <div>Obs: {x.observatii}</div>}
+                <div style={{ opacity: 0.8 }}>
+                  de la: {x.voluntar} | {x.createdAt}
+                </div>
+              </>
+            )}
+          </div>
+        ))}
       </div>
-    </>
+    </div>
   );
 }

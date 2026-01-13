@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { API } from "../api";
+import { apiGet, apiSend } from "../api";
 
 export default function Atribuire({ showToast }) {
   const [interventii, setInterventii] = useState([]);
@@ -8,63 +8,50 @@ export default function Atribuire({ showToast }) {
   const [interventieId, setInterventieId] = useState("");
   const [voluntarId, setVoluntarId] = useState("");
 
-  async function load() {
+  async function loadData() {
     try {
-      const r1 = await fetch(`${API}/interventii`);
-      const i = await r1.json();
-      setInterventii(i);
+      const ints = await apiGet("/interventii");
+      const onlyNeatribuite = ints.filter((x) => !x.voluntarId);
+      setInterventii(onlyNeatribuite);
 
-      // default: prima interventie neatribuita, altfel prima
-      const ne = i.find((x) => !x.voluntarId);
-      setInterventieId(String((ne || i[0] || {}).id || ""));
-
-      const r2 = await fetch(`${API}/voluntari`);
-      const v = await r2.json();
+      const v = await apiGet("/voluntari");
       setVoluntari(v);
-      setVoluntarId(String((v[0] || {}).id || ""));
+
+      if (onlyNeatribuite.length && !interventieId) setInterventieId(onlyNeatribuite[0].id);
+      if (v.length && !voluntarId) setVoluntarId(v[0].id);
     } catch {
-      showToast("Eroare la incarcare date.", "error");
+      showToast("Eroare: nu pot incarca datele.", "error");
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    loadData();
+  }, []);
 
-  async function assign() {
-    if (!interventieId || !voluntarId) {
-      showToast("Alege interventie si voluntar.", "error");
-      return;
-    }
-
+  async function atribuie() {
     try {
-      const res = await fetch(`${API}/atribuiri`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ interventieId: Number(interventieId), voluntarId: Number(voluntarId) }),
+      await apiSend("/atribuiri", "POST", {
+        interventieId: Number(interventieId),
+        voluntarId: Number(voluntarId),
       });
 
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        showToast(err.message || "Eroare la atribuire.", "error");
-        return;
-      }
-
-      showToast("Interventie atribuita!", "success");
-      load();
+      showToast("Interventie atribuita!");
+      loadData();
     } catch {
-      showToast("Backend indisponibil.", "error");
+      showToast("Eroare la atribuire.", "error");
     }
   }
 
   return (
-    <>
+    <div>
       <h1>Atribuire cazuri</h1>
 
       <div className="card">
         <label>Interventie</label>
         <select value={interventieId} onChange={(e) => setInterventieId(e.target.value)}>
-          {interventii.map((i) => (
-            <option key={i.id} value={i.id}>
-              #{i.id} - {i.tip} ({i.beneficiar}) | {i.voluntar ? i.voluntar : "neatribuit"}
+          {interventii.map((x) => (
+            <option key={x.id} value={x.id}>
+              #{x.id} - {x.tip} ({x.beneficiar})
             </option>
           ))}
         </select>
@@ -72,16 +59,22 @@ export default function Atribuire({ showToast }) {
         <label>Voluntar</label>
         <select value={voluntarId} onChange={(e) => setVoluntarId(e.target.value)}>
           {voluntari.map((v) => (
-            <option key={v.id} value={v.id}>{v.nume}</option>
+            <option key={v.id} value={v.id}>
+              {v.nume}
+            </option>
           ))}
         </select>
 
-        <button className="button" onClick={assign}>Asigneaza</button>
-      </div>
+        <button className="button" onClick={atribuie} disabled={!interventii.length}>
+          Asigneaza
+        </button>
 
-      <p className="hint">
-        Tip: creeaza interventii in pagina <b>Interventii</b>, apoi vino aici sa le atribui.
-      </p>
-    </>
+        {!interventii.length && (
+          <p style={{ marginTop: 10, opacity: 0.8 }}>
+            Nu exista interventii neatribuite. Creeaza unele in pagina <b>Interventii</b>.
+          </p>
+        )}
+      </div>
+    </div>
   );
 }

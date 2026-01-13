@@ -1,158 +1,165 @@
 import { useEffect, useState } from "react";
-import { API } from "../api";
+import { apiGet, apiSend } from "../api";
 
-const TIPURI = ["Livrare alimente", "Vizita", "Insotire pe strada"];
+const TIPURI = ["Livrare alimente", "Insotire pe strada", "Ajutor general"];
+const STATUSURI = ["Preluata", "In curs", "Finalizata"];
 
-export default function Interventii({ showToast, role, voluntarId }) {
-  const [list, setList] = useState([]);
+function nextStatus(current) {
+  const idx = STATUSURI.indexOf(current);
+  if (idx === -1) return "Preluata";
+  return STATUSURI[(idx + 1) % STATUSURI.length];
+}
+
+export default function Interventii({ showToast, role, selectedVoluntarId }) {
+  const [items, setItems] = useState([]);
   const [beneficiari, setBeneficiari] = useState([]);
 
-  // formular admin
   const [tip, setTip] = useState(TIPURI[0]);
   const [beneficiarId, setBeneficiarId] = useState("");
   const [descriere, setDescriere] = useState("");
 
-  async function load() {
+  async function loadAll() {
     try {
-      const r1 = await fetch(`${API}/interventii`);
-      const data1 = await r1.json();
-      setList(data1);
+      const b = await apiGet("/beneficiari");
+      setBeneficiari(b);
+      if (!beneficiarId && b.length) setBeneficiarId(b[0].id);
 
-      const r2 = await fetch(`${API}/beneficiari`);
-      const data2 = await r2.json();
-      setBeneficiari(data2);
+      const path =
+        role === "voluntar" && selectedVoluntarId
+          ? `/interventii?voluntarId=${selectedVoluntarId}`
+          : "/interventii";
 
-      if (!beneficiarId && data2.length) setBeneficiarId(String(data2[0].id));
+      const data = await apiGet(path);
+      setItems(data);
     } catch {
-      showToast("Eroare: nu pot incarca datele.", "error");
+      showToast("Eroare: nu pot incarca interventiile.", "error");
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    loadAll();
+  }, [role, selectedVoluntarId]);
 
-  async function addInterventie() {
-    if (!beneficiarId) {
-      showToast("Alege un beneficiar.", "error");
-      return;
-    }
-
+  async function createInterventie() {
     try {
-      const res = await fetch(`${API}/interventii`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tip, beneficiarId: Number(beneficiarId), descriere }),
+      await apiSend("/interventii", "POST", {
+        tip,
+        beneficiarId: Number(beneficiarId),
+        descriere,
       });
-
-      if (!res.ok) {
-        showToast("Eroare la creare interventie.", "error");
-        return;
-      }
-
-      showToast("Interventie creata!", "success");
       setDescriere("");
-      load();
+      showToast("Interventie creata!");
+      loadAll();
     } catch {
-      showToast("Backend indisponibil.", "error");
+      showToast("Eroare la creare interventie.", "error");
     }
   }
 
-  async function updateStatus(id, current) {
-    const next =
-      current === "Noua" ? "Preluata" :
-      current === "Preluata" ? "In curs" :
-      current === "In curs" ? "Finalizata" :
-      "Noua";
-
+  async function updateStatus(id, currentStatus) {
     try {
-      const res = await fetch(`${API}/interventii/${id}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: next }),
-      });
-
-      if (!res.ok) {
-        showToast("Eroare la actualizare status.", "error");
-        return;
-      }
-
-      showToast("Status actualizat!", "success");
-      load();
+      const ns = nextStatus(currentStatus);
+      await apiSend(`/interventii/${id}/status`, "PATCH", { status: ns });
+      showToast("Status actualizat!");
+      loadAll();
     } catch {
-      showToast("Backend indisponibil.", "error");
+      showToast("Eroare la status.", "error");
     }
   }
 
-  async function deleteInterventie(id) {
-    if (!confirm("Stergi interventia?")) return;
-
+  async function removeItem(id) {
     try {
-      const res = await fetch(`${API}/interventii/${id}`, { method: "DELETE" });
-      if (!res.ok) {
-        showToast("Eroare la stergere.", "error");
-        return;
-      }
-      showToast("Interventie stearsa.", "success");
-      load();
+      await apiSend(`/interventii/${id}`, "DELETE");
+      showToast("Interventie stearsa!");
+      loadAll();
     } catch {
-      showToast("Backend indisponibil.", "error");
+      showToast("Eroare la stergere.", "error");
     }
   }
-
-  const visible = role === "voluntar"
-    ? list.filter((i) => i.voluntarId === voluntarId)
-    : list;
 
   return (
-    <>
+    <div>
       <h1>Interventii</h1>
 
       {role === "admin" && (
         <div className="card">
-          <h3>Adauga interventie</h3>
+          <h3>Creeaza interventie</h3>
 
-          <label>Tip interventie</label>
+          <label>Tip</label>
           <select value={tip} onChange={(e) => setTip(e.target.value)}>
-            {TIPURI.map((t) => <option key={t} value={t}>{t}</option>)}
+            {TIPURI.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
           </select>
 
           <label>Beneficiar</label>
-          <select value={beneficiarId} onChange={(e) => setBeneficiarId(e.target.value)}>
+          <select
+            value={beneficiarId}
+            onChange={(e) => setBeneficiarId(e.target.value)}
+          >
             {beneficiari.map((b) => (
-              <option key={b.id} value={b.id}>{b.nume} ({b.categorie})</option>
+              <option key={b.id} value={b.id}>
+                {b.nume} ({b.categorie})
+              </option>
             ))}
           </select>
 
           <label>Descriere (optional)</label>
-          <input value={descriere} onChange={(e) => setDescriere(e.target.value)} />
+          <input
+            value={descriere}
+            onChange={(e) => setDescriere(e.target.value)}
+            placeholder="ex: pachet saptamanal"
+          />
 
-          <button className="button" onClick={addInterventie}>Creeaza</button>
+          <button className="button" onClick={createInterventie}>
+            Creeaza
+          </button>
         </div>
       )}
 
       <div className="list">
-      {visible.map((i) => (
-        <div key={i.id} className="card">
-          <p><b>#{i.id} - {i.tip}</b></p>
-          <p>Beneficiar: {i.beneficiar}</p>
-          <p>Voluntar: {i.voluntar ? i.voluntar : "neatribuit"}</p>
-          <p>Status: {i.status}</p>
+        {items.length === 0 && (
+          <div className="card">
+            {role === "voluntar"
+              ? "Nu ai interventii atribuite."
+              : "Nu exista interventii."}
+          </div>
+        )}
 
-          <button className="button" onClick={() => updateStatus(i.id, i.status)}>
-            Actualizeaza status
-          </button>
+        {items.map((x) => (
+          <div className="card" key={x.id}>
+            <h3>
+              #{x.id} - {x.tip}
+            </h3>
+            <div>Beneficiar: {x.beneficiar}</div>
+            <div>Voluntar: {x.voluntar ?? "Neatribuit"}</div>
+            <div>Status: {x.status}</div>
+            {x.descriere && <div>Descriere: {x.descriere}</div>}
 
-          {role === "admin" && (
-            <button className="button danger" onClick={() => deleteInterventie(i.id)}>
-              Sterge
-            </button>
-          )}
-        </div>
-      ))}
+            <div style={{ marginTop: 10 }}>
+              {(role === "admin" || role === "voluntar") && x.voluntar && (
+                <button
+                  className="button"
+                  onClick={() => updateStatus(x.id, x.status)}
+                >
+                  Actualizeaza status
+                </button>
+              )}
+
+              {role === "admin" && (
+                <button
+                  className="button"
+                  style={{ marginLeft: 10, background: "#e74c3c" }}
+                  onClick={() => removeItem(x.id)}
+                >
+                  Sterge
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
-
-      {role === "voluntar" && visible.length === 0 && (
-        <p>Nu ai interventii atribuite.</p>
-      )}
-    </>
+    </div>
   );
 }

@@ -1,41 +1,35 @@
 import { useEffect, useState } from "react";
+import "./App.css";
 
 import Interventii from "./pages/Interventii";
 import Beneficiari from "./pages/Beneficiari";
 import Voluntari from "./pages/Voluntari";
-import Urgenta from "./pages/Urgenta";
 import Atribuire from "./pages/Atribuire";
+import Urgenta from "./pages/Urgenta";
 import Vizite from "./pages/Vizite";
 import Evaluare from "./pages/Evaluare";
-import { API } from "./api";
+
+import { apiGet } from "./api";
 
 function App() {
-  const [role, setRole] = useState("admin"); 
+  const [role, setRole] = useState("admin"); // admin | voluntar
   const [page, setPage] = useState("interventii");
 
-  const [voluntari, setVoluntari] = useState([]);
-  const [voluntarId, setVoluntarId] = useState(null); 
-
   const [toast, setToast] = useState({ text: "", type: "" });
+
+  const [voluntari, setVoluntari] = useState([]);
+  const [selectedVoluntarId, setSelectedVoluntarId] = useState(null);
 
   function showToast(text, type = "success") {
     setToast({ text, type });
     setTimeout(() => setToast({ text: "", type: "" }), 2500);
   }
 
-  function navClass(p) {
-    return page === p ? "navBtn active" : "navBtn";
-  }
-
   async function loadVoluntari() {
     try {
-      const res = await fetch(`${API}/voluntari`);
-      const data = await res.json();
+      const data = await apiGet("/voluntari");
       setVoluntari(data);
-
-      if (!voluntarId && data.length) {
-        setVoluntarId(data[0].id);
-      }
+      if (!selectedVoluntarId && data.length) setSelectedVoluntarId(data[0].id);
     } catch {
       showToast("Eroare: nu pot incarca voluntarii.", "error");
     }
@@ -45,19 +39,28 @@ function App() {
     loadVoluntari();
   }, []);
 
-  function changeRole(newRole) {
-    setRole(newRole);
-
-    if (newRole === "voluntar") {
-      setPage("interventii");
-      if (!voluntarId && voluntari.length) setVoluntarId(voluntari[0].id);
-      showToast("Rol: Voluntar", "success");
-    } else {
-      showToast("Rol: Admin", "success");
+  useEffect(() => {
+    if (role === "voluntar" && !selectedVoluntarId && voluntari.length) {
+      setSelectedVoluntarId(voluntari[0].id);
     }
+  }, [role, selectedVoluntarId, voluntari]);
 
-    if (newRole === "voluntar" && page === "atribuire") setPage("interventii");
-    if (newRole === "voluntar" && page === "voluntari") setPage("interventii");
+  function canSee(p) {
+    if (role === "admin") return true;
+    return !["atribuire", "voluntari"].includes(p);
+  }
+
+  function navBtn(key, label) {
+    if (!canSee(key)) return null;
+    return (
+      <button
+        key={key}
+        className={page === key ? "nav active" : "nav"}
+        onClick={() => setPage(key)}
+      >
+        {label}
+      </button>
+    );
   }
 
   return (
@@ -65,27 +68,18 @@ function App() {
       <div className="sidebar">
         <h2>PIU</h2>
 
-        {/* ROL */}
-        <div className="roleBox">
-          <label className="roleLabel">Rol</label>
-          <select
-            className="roleSelect"
-            value={role}
-            onChange={(e) => changeRole(e.target.value)}
-          >
-            <option value="admin">Admin</option>
-            <option value="voluntar">Voluntar</option>
-          </select>
-        </div>
+        <label className="smallLabel">Rol</label>
+        <select value={role} onChange={(e) => setRole(e.target.value)}>
+          <option value="admin">Admin</option>
+          <option value="voluntar">Voluntar</option>
+        </select>
 
-        {/* SELECT VOLUNTAR (doar pe rol voluntar) */}
         {role === "voluntar" && (
-          <div className="roleBox">
-            <label className="roleLabel">Voluntar</label>
+          <>
+            <label className="smallLabel">Voluntar</label>
             <select
-              className="roleSelect"
-              value={voluntarId ?? ""}
-              onChange={(e) => setVoluntarId(Number(e.target.value))}
+              value={selectedVoluntarId ?? ""}
+              onChange={(e) => setSelectedVoluntarId(Number(e.target.value))}
             >
               {voluntari.map((v) => (
                 <option key={v.id} value={v.id}>
@@ -93,37 +87,18 @@ function App() {
                 </option>
               ))}
             </select>
-          </div>
-        )}
-
-        <button className={navClass("interventii")} onClick={() => setPage("interventii")}>
-          Interventii
-        </button>
-        <button className={navClass("beneficiari")} onClick={() => setPage("beneficiari")}>
-          Beneficiari
-        </button>
-
-        {/* Admin only: Voluntari + Atribuire */}
-        {role === "admin" && (
-          <>
-            <button className={navClass("voluntari")} onClick={() => setPage("voluntari")}>
-              Voluntari
-            </button>
-            <button className={navClass("atribuire")} onClick={() => setPage("atribuire")}>
-              Atribuire cazuri
-            </button>
           </>
         )}
 
-        <button className={navClass("urgenta")} onClick={() => setPage("urgenta")}>
-          Urgenta
-        </button>
-<button className={navClass("vizite")} onClick={() => setPage("vizite")}>
-          Programare vizite
-        </button>
-<button className={navClass("evaluare")} onClick={() => setPage("evaluare")}>
-          Evaluare progres
-        </button>
+        <div style={{ marginTop: 12 }}>
+          {navBtn("interventii", "Interventii")}
+          {navBtn("beneficiari", "Beneficiari")}
+          {role === "admin" && navBtn("voluntari", "Voluntari")}
+          {role === "admin" && navBtn("atribuire", "Atribuire cazuri")}
+          {navBtn("urgenta", "Urgenta")}
+          {navBtn("vizite", "Programare vizite")}
+          {navBtn("evaluare", "Evaluare progres")}
+        </div>
       </div>
 
       <div className="content">
@@ -133,16 +108,18 @@ function App() {
           <Interventii
             showToast={showToast}
             role={role}
-            voluntarId={voluntarId}
-            refreshVoluntari={loadVoluntari}
+            selectedVoluntarId={selectedVoluntarId}
           />
         )}
+
         {page === "beneficiari" && (
           <Beneficiari showToast={showToast} role={role} />
         )}
+
         {page === "voluntari" && role === "admin" && (
-          <Voluntari showToast={showToast} refreshVoluntari={loadVoluntari} />
+          <Voluntari showToast={showToast} onChanged={loadVoluntari} />
         )}
+
         {page === "atribuire" && role === "admin" && (
           <Atribuire showToast={showToast} />
         )}
@@ -151,11 +128,25 @@ function App() {
           <Urgenta
             showToast={showToast}
             role={role}
-            voluntarId={voluntarId}
+            selectedVoluntarId={selectedVoluntarId}
           />
         )}
-        {page === "vizite" && <Vizite showToast={showToast} role={role} voluntar={voluntari.find(v=>v.id===voluntarId)?.nume || ""} />}
-        {page === "evaluare" && <Evaluare showToast={showToast} />}
+
+        {page === "vizite" && (
+          <Vizite
+            showToast={showToast}
+            role={role}
+            selectedVoluntarId={selectedVoluntarId}
+          />
+        )}
+
+        {page === "evaluare" && (
+          <Evaluare
+            showToast={showToast}
+            role={role}
+            selectedVoluntarId={selectedVoluntarId}
+          />
+        )}
       </div>
     </div>
   );

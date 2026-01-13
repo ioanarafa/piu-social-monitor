@@ -34,12 +34,9 @@ export async function getDb() {
       beneficiarId INTEGER NOT NULL,
       voluntarId INTEGER,
       createdAt TEXT NOT NULL,
-      dataVizita TEXT,
-      oraVizita TEXT,
       FOREIGN KEY(beneficiarId) REFERENCES beneficiari(id) ON DELETE RESTRICT,
       FOREIGN KEY(voluntarId) REFERENCES voluntari(id) ON DELETE SET NULL
     );
-
 
     CREATE TABLE IF NOT EXISTS urgente (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,9 +46,38 @@ export async function getDb() {
       FOREIGN KEY(voluntarId) REFERENCES voluntari(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS vizite (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      beneficiarId INTEGER NOT NULL,
+      voluntarId INTEGER NOT NULL,
+      data TEXT NOT NULL,
+      ora TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      FOREIGN KEY(beneficiarId) REFERENCES beneficiari(id) ON DELETE RESTRICT,
+      FOREIGN KEY(voluntarId) REFERENCES voluntari(id) ON DELETE RESTRICT
+    );
+
+    CREATE TABLE IF NOT EXISTS evaluari_voluntari (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      voluntarId INTEGER NOT NULL,
+      scor INTEGER NOT NULL,
+      observatii TEXT,
+      createdAt TEXT NOT NULL,
+      FOREIGN KEY(voluntarId) REFERENCES voluntari(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS evaluari_beneficiari (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      beneficiarId INTEGER NOT NULL,
+      voluntarId INTEGER NOT NULL,
+      scor INTEGER NOT NULL,
+      observatii TEXT,
+      createdAt TEXT NOT NULL,
+      FOREIGN KEY(beneficiarId) REFERENCES beneficiari(id) ON DELETE CASCADE,
+      FOREIGN KEY(voluntarId) REFERENCES voluntari(id) ON DELETE CASCADE
+    );
   `);
 
-  // seed minim (doar daca sunt goale)
   const vCount = (await db.get("SELECT COUNT(*) as c FROM voluntari")).c;
   if (vCount === 0) {
     await db.run("INSERT INTO voluntari(nume) VALUES (?), (?)", ["Ana Pop", "Mihai Rusu"]);
@@ -59,10 +85,10 @@ export async function getDb() {
 
   const bCount = (await db.get("SELECT COUNT(*) as c FROM beneficiari")).c;
   if (bCount === 0) {
-    await db.run("INSERT INTO beneficiari(nume, categorie) VALUES (?, ?), (?, ?)", [
-      "Pop Maria", "Pensionar",
-      "Ionescu Vasile", "Handicap"
-    ]);
+    await db.run(
+      "INSERT INTO beneficiari(nume, categorie) VALUES (?, ?), (?, ?)",
+      ["Pop Maria", "Pensionar", "Ionescu Vasile", "Handicap"]
+    );
   }
 
   const iCount = (await db.get("SELECT COUNT(*) as c FROM interventii")).c;
@@ -71,15 +97,14 @@ export async function getDb() {
     const b1 = await db.get("SELECT id FROM beneficiari WHERE nume = ?", ["Pop Maria"]);
     const b2 = await db.get("SELECT id FROM beneficiari WHERE nume = ?", ["Ionescu Vasile"]);
     const v1 = await db.get("SELECT id FROM voluntari WHERE nume = ?", ["Ana Pop"]);
-    const v2 = await db.get("SELECT id FROM voluntari WHERE nume = ?", ["Mihai Rusu"]);
 
     await db.run(
       "INSERT INTO interventii(tip,status,descriere,beneficiarId,voluntarId,createdAt) VALUES (?,?,?,?,?,?)",
-      ["Livrare alimente", "In curs", "", b1.id, v1.id, now]
+      ["Livrare alimente", "In curs", "Pachet saptamanal", b1.id, v1.id, now]
     );
     await db.run(
       "INSERT INTO interventii(tip,status,descriere,beneficiarId,voluntarId,createdAt) VALUES (?,?,?,?,?,?)",
-      ["Vizita", "Preluata", "", b2.id, v2.id, now]
+      ["Insotire pe strada", "Preluata", "", b2.id, null, now]
     );
   }
 

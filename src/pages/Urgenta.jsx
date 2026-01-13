@@ -1,101 +1,62 @@
 import { useEffect, useState } from "react";
-import { API } from "../api";
+import { apiGet, apiSend } from "../api";
 
-export default function Urgenta({ showToast, role, voluntarId }) {
-  const [text, setText] = useState("");
-  const [list, setList] = useState([]);
+export default function Urgenta({ showToast, role, selectedVoluntarId }) {
+  const [mesaj, setMesaj] = useState("");
+  const [items, setItems] = useState([]);
 
   async function load() {
     try {
-      const url =
-        role === "voluntar" && voluntarId
-          ? `${API}/urgente?voluntarId=${voluntarId}`
-          : `${API}/urgente`;
-
-      const res = await fetch(url);
-      const data = await res.json();
-      setList(data);
+      const path =
+        role === "voluntar" && selectedVoluntarId
+          ? `/urgente?voluntarId=${selectedVoluntarId}`
+          : "/urgente";
+      setItems(await apiGet(path));
     } catch {
       showToast("Eroare: nu pot incarca urgentele.", "error");
     }
   }
 
+  useEffect(() => {
+    load();
+  }, [role, selectedVoluntarId]);
+
   async function send() {
-    if (!text.trim()) {
-      showToast("Completeaza descrierea!", "error");
-      return;
-    }
-    if (!voluntarId) {
-      showToast("Selecteaza voluntarul!", "error");
-      return;
-    }
-
     try {
-      const res = await fetch(`${API}/urgente`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mesaj: text, voluntarId }),
+      await apiSend("/urgente", "POST", {
+        mesaj,
+        voluntarId: Number(selectedVoluntarId),
       });
-
-      if (!res.ok) {
-        showToast("Eroare la trimitere urgenta.", "error");
-        return;
-      }
-
-      showToast("Urgenta trimisa catre admin!", "success");
-      setText("");
+      setMesaj("");
+      showToast("Urgenta trimisa!");
       load();
     } catch {
-      showToast("Backend indisponibil.", "error");
+      showToast("Eroare la trimitere urgenta.", "error");
     }
   }
 
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [role, voluntarId]);
-
   return (
-    <>
+    <div>
       <h1>Urgenta</h1>
 
-      {role === "voluntar" ? (
+      {role === "voluntar" && (
         <div className="card">
-          <label>Raportare urgenta</label>
-          <textarea
-            placeholder="Descriere situatie urgenta..."
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-          />
-          <button className="button" onClick={send}>
-            Trimite
-          </button>
-          <p className="hint">
-            Adminul va vedea toate urgentele trimise de voluntari.
-          </p>
-        </div>
-      ) : (
-        <div className="card">
-          <p className="hint">
-            (Admin) Aici vezi toate urgentele raportate de voluntari.
-          </p>
+          <h3>Raportare urgenta</h3>
+          <label>Mesaj</label>
+          <textarea value={mesaj} onChange={(e) => setMesaj(e.target.value)} />
+          <button className="button" onClick={send}>Trimite</button>
         </div>
       )}
 
       <div className="list">
-        {list.length === 0 ? (
-          <p>Nicio urgenta inregistrata.</p>
-        ) : (
-          list.map((u) => (
-            <div key={u.id} className="card">
-              <p>
-                <b>{u.voluntar || "Voluntar"}</b> • {u.createdAt}
-              </p>
-              <p>{u.mesaj}</p>
-            </div>
-          ))
-        )}
+        {items.map((u) => (
+          <div className="card" key={u.id}>
+            <h3>{u.voluntar}</h3>
+            <div style={{ opacity: 0.8 }}>{u.createdAt}</div>
+            <div style={{ marginTop: 8 }}>{u.mesaj}</div>
+          </div>
+        ))}
       </div>
-    </>
+    </div>
   );
 }

@@ -3,308 +3,392 @@ import cors from "cors";
 import { getDb } from "./db.js";
 
 const app = express();
+const PORT = 3001;
+
 app.use(cors());
 app.use(express.json());
-
-const PORT = 3001;
 
 function cleanText(s) {
   return String(s ?? "").trim();
 }
+function nowISO() {
+  return new Date().toISOString();
+}
 
-app.get("/api/health", async (req, res) => {
+app.get("/api/health", (req, res) => {
   res.json({ ok: true, message: "Backend PIU merge!" });
 });
 
-/* -------------------- VOLUNTARI (CRUD) -------------------- */
 app.get("/api/voluntari", async (req, res) => {
-  const db = await getDb();
-  const rows = await db.all("SELECT id, nume FROM voluntari ORDER BY nume");
-  res.json(rows);
-});
-
-app.post("/api/voluntari", async (req, res) => {
-  const nume = cleanText(req.body?.nume);
-  if (!nume) return res.status(400).json({ message: "Nume obligatoriu" });
-
   try {
     const db = await getDb();
-    const r = await db.run("INSERT INTO voluntari(nume) VALUES (?)", [nume]);
-    res.status(201).json({ id: r.lastID, nume });
+    res.json(await db.all("SELECT * FROM voluntari ORDER BY nume"));
   } catch (e) {
-    res.status(400).json({ message: "Nu pot salva voluntarul (poate exista deja)." });
+    console.error(e);
+    res.status(500).json({ message: "Eroare la voluntari" });
   }
 });
 
-app.put("/api/voluntari/:id", async (req, res) => {
-  const id = Number(req.params.id);
-  const nume = cleanText(req.body?.nume);
-  if (!id || !nume) return res.status(400).json({ message: "Date invalide" });
-
+app.post("/api/voluntari", async (req, res) => {
   try {
+    const nume = cleanText(req.body?.nume);
+    if (!nume) return res.status(400).json({ message: "Nume obligatoriu" });
     const db = await getDb();
-    await db.run("UPDATE voluntari SET nume=? WHERE id=?", [nume, id]);
-    res.json({ id, nume });
-  } catch {
-    res.status(400).json({ message: "Nu pot actualiza voluntarul." });
+    await db.run("INSERT INTO voluntari(nume) VALUES (?)", [nume]);
+    res.status(201).json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ message: "Eroare la adaugare voluntar" });
   }
 });
 
 app.delete("/api/voluntari/:id", async (req, res) => {
-  const id = Number(req.params.id);
-  if (!id) return res.status(400).json({ message: "ID invalid" });
-
-  const db = await getDb();
-  const used = await db.get("SELECT COUNT(*) as c FROM interventii WHERE voluntarId = ?", [id]);
-  if (used.c > 0) return res.status(400).json({ message: "Voluntar are interventii asignate." });
-
-  await db.run("DELETE FROM voluntari WHERE id = ?", [id]);
-  res.json({ ok: true });
+  try {
+    const id = Number(req.params.id);
+    const db = await getDb();
+    await db.run("DELETE FROM voluntari WHERE id=?", [id]);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ message: "Eroare la stergere voluntar" });
+  }
 });
 
-/* -------------------- BENEFICIARI (CRUD) -------------------- */
 app.get("/api/beneficiari", async (req, res) => {
-  const db = await getDb();
-  const categorie = cleanText(req.query?.categorie);
-  const rows = categorie
-    ? await db.all("SELECT id, nume, categorie FROM beneficiari WHERE categorie=? ORDER BY nume", [categorie])
-    : await db.all("SELECT id, nume, categorie FROM beneficiari ORDER BY nume");
-  res.json(rows);
+  try {
+    const db = await getDb();
+    res.json(await db.all("SELECT * FROM beneficiari ORDER BY nume"));
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ message: "Eroare la beneficiari" });
+  }
 });
 
 app.post("/api/beneficiari", async (req, res) => {
-  const nume = cleanText(req.body?.nume);
-  const categorie = cleanText(req.body?.categorie);
-  if (!nume || !categorie) return res.status(400).json({ message: "Nume si categorie obligatorii" });
+  try {
+    const nume = cleanText(req.body?.nume);
+    const categorie = cleanText(req.body?.categorie);
+    if (!nume || !categorie) return res.status(400).json({ message: "Campuri incomplete" });
 
-  const db = await getDb();
-  const r = await db.run("INSERT INTO beneficiari(nume, categorie) VALUES (?,?)", [nume, categorie]);
-  res.status(201).json({ id: r.lastID, nume, categorie });
+    const db = await getDb();
+    await db.run("INSERT INTO beneficiari(nume, categorie) VALUES (?,?)", [nume, categorie]);
+    res.status(201).json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ message: "Eroare la adaugare beneficiar" });
+  }
 });
 
 app.put("/api/beneficiari/:id", async (req, res) => {
-  const id = Number(req.params.id);
-  const nume = cleanText(req.body?.nume);
-  const categorie = cleanText(req.body?.categorie);
-  if (!id || !nume || !categorie) return res.status(400).json({ message: "Date invalide" });
+  try {
+    const id = Number(req.params.id);
+    const nume = cleanText(req.body?.nume);
+    const categorie = cleanText(req.body?.categorie);
+    if (!nume || !categorie) return res.status(400).json({ message: "Campuri incomplete" });
 
-  const db = await getDb();
-  await db.run("UPDATE beneficiari SET nume=?, categorie=? WHERE id=?", [nume, categorie, id]);
-  res.json({ id, nume, categorie });
+    const db = await getDb();
+    await db.run("UPDATE beneficiari SET nume=?, categorie=? WHERE id=?", [nume, categorie, id]);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ message: "Eroare la editare beneficiar" });
+  }
 });
 
 app.delete("/api/beneficiari/:id", async (req, res) => {
-  const id = Number(req.params.id);
-  if (!id) return res.status(400).json({ message: "ID invalid" });
-
-  const db = await getDb();
-  const used = await db.get("SELECT COUNT(*) as c FROM interventii WHERE beneficiarId = ?", [id]);
-  if (used.c > 0) return res.status(400).json({ message: "Beneficiar are interventii. Sterge interventiile intai." });
-
-  await db.run("DELETE FROM beneficiari WHERE id = ?", [id]);
-  res.json({ ok: true });
+  try {
+    const id = Number(req.params.id);
+    const db = await getDb();
+    await db.run("DELETE FROM beneficiari WHERE id=?", [id]);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ message: "Eroare la stergere beneficiar" });
+  }
 });
 
-/* -------------------- INTERVENTII -------------------- */
-// lista cu join pe nume
 app.get("/api/interventii", async (req, res) => {
-  const db = await getDb();
-  const rows = await db.all(`
-    SELECT i.id, i.tip, i.status, IFNULL(i.descriere,'') as descriere,
-           b.nume as beneficiar,
-           IFNULL(v.nume,'') as voluntar,
-           i.beneficiarId, i.voluntarId
-    FROM interventii i
-    JOIN beneficiari b ON b.id = i.beneficiarId
-    LEFT JOIN voluntari v ON v.id = i.voluntarId
-    ORDER BY i.id DESC
-  `);
-  res.json(rows);
+  try {
+    const db = await getDb();
+    const voluntarId = req.query.voluntarId ? Number(req.query.voluntarId) : null;
+
+    const sql = `
+      SELECT i.id, i.tip, i.status, i.descriere, i.createdAt,
+             b.id as beneficiarId, b.nume as beneficiar, b.categorie as categorie,
+             v.id as voluntarId, v.nume as voluntar
+      FROM interventii i
+      JOIN beneficiari b ON b.id = i.beneficiarId
+      LEFT JOIN voluntari v ON v.id = i.voluntarId
+      ${voluntarId ? "WHERE i.voluntarId = ?" : ""}
+      ORDER BY i.id DESC
+    `;
+    const rows = voluntarId ? await db.all(sql, [voluntarId]) : await db.all(sql);
+    res.json(rows);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ message: "Eroare la interventii" });
+  }
 });
 
-// admin: creeaza interventie (fara voluntar, sau optional)
 app.post("/api/interventii", async (req, res) => {
-  const tip = cleanText(req.body?.tip);
-  const beneficiarId = Number(req.body?.beneficiarId);
-  const descriere = cleanText(req.body?.descriere);
-  if (!tip || !beneficiarId) return res.status(400).json({ message: "Tip si beneficiarId obligatorii" });
+  try {
+    const tip = cleanText(req.body?.tip);
+    const descriere = cleanText(req.body?.descriere);
+    const beneficiarId = Number(req.body?.beneficiarId);
 
-  const db = await getDb();
-  const now = new Date().toISOString();
-  const r = await db.run(
-    "INSERT INTO interventii(tip,status,descriere,beneficiarId,voluntarId,createdAt) VALUES (?,?,?,?,?,?)",
-    [tip, "Noua", descriere, beneficiarId, null, now]
-  );
-  res.status(201).json({ id: r.lastID, tip, status: "Noua", descriere, beneficiarId, voluntarId: null });
+    if (!tip || !beneficiarId) return res.status(400).json({ message: "tip si beneficiarId obligatorii" });
+
+    const db = await getDb();
+    const createdAt = nowISO();
+    const status = "Neatribuita";
+
+    await db.run(
+      "INSERT INTO interventii(tip,status,descriere,beneficiarId,voluntarId,createdAt) VALUES (?,?,?,?,?,?)",
+      [tip, status, descriere, beneficiarId, null, createdAt]
+    );
+
+    res.status(201).json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ message: "Eroare la creare interventie" });
+  }
 });
 
 app.patch("/api/interventii/:id/status", async (req, res) => {
-  const id = Number(req.params.id);
-  const status = cleanText(req.body?.status);
-  if (!id || !status) return res.status(400).json({ message: "Date invalide" });
+  try {
+    const id = Number(req.params.id);
+    const status = cleanText(req.body?.status);
+    if (!status) return res.status(400).json({ message: "status obligatoriu" });
 
-  const db = await getDb();
-  await db.run("UPDATE interventii SET status=? WHERE id=?", [status, id]);
-  res.json({ ok: true });
-});
-
-app.patch("/api/interventii/:id/vizita", async (req, res) => {
-  const id = Number(req.params.id);
-  const dataVizita = cleanText(req.body?.dataVizita);
-  const oraVizita = cleanText(req.body?.oraVizita);
-
-  if (!id || !dataVizita || !oraVizita) {
-    return res.status(400).json({ message: "Date invalide" });
+    const db = await getDb();
+    await db.run("UPDATE interventii SET status=? WHERE id=?", [status, id]);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ message: "Eroare la status" });
   }
-
-  const db = await getDb();
-  await db.run(
-    "UPDATE interventii SET dataVizita=?, oraVizita=? WHERE id=?",
-    [dataVizita, oraVizita, id]
-  );
-
-  res.json({ ok: true });
 });
-
 
 app.delete("/api/interventii/:id", async (req, res) => {
-  const id = Number(req.params.id);
-  if (!id) return res.status(400).json({ message: "ID invalid" });
-
-  const db = await getDb();
-  await db.run("DELETE FROM interventii WHERE id=?", [id]);
-  res.json({ ok: true });
+  try {
+    const id = Number(req.params.id);
+    const db = await getDb();
+    await db.run("DELETE FROM interventii WHERE id=?", [id]);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ message: "Eroare la stergere interventie" });
+  }
 });
-
 
 app.post("/api/atribuiri", async (req, res) => {
-  const interventieId = Number(req.body?.interventieId);
-  const voluntarId = Number(req.body?.voluntarId);
-  if (!interventieId || !voluntarId) return res.status(400).json({ message: "interventieId si voluntarId obligatorii" });
+  try {
+    const interventieId = Number(req.body?.interventieId);
+    const voluntarId = Number(req.body?.voluntarId);
+    if (!interventieId || !voluntarId) {
+      return res.status(400).json({ message: "interventieId si voluntarId obligatorii" });
+    }
 
-  const db = await getDb();
-  const exists = await db.get("SELECT id FROM interventii WHERE id=?", [interventieId]);
-  if (!exists) return res.status(404).json({ message: "Interventie inexistenta" });
+    const db = await getDb();
+    const exists = await db.get("SELECT id FROM interventii WHERE id=?", [interventieId]);
+    if (!exists) return res.status(404).json({ message: "Interventie inexistenta" });
 
-  await db.run("UPDATE interventii SET voluntarId=? WHERE id=?", [voluntarId, interventieId]);
-  res.json({ ok: true });
+    await db.run("UPDATE interventii SET voluntarId=?, status=? WHERE id=?", [
+      voluntarId,
+      "Preluata",
+      interventieId,
+    ]);
+
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ message: "Eroare la atribuire" });
+  }
 });
 
-/* -------------------- RESTUL (ramane simplu, in memorie) -------------------- */
-/* Pentru moment pastram ca demo: urgente/alerte/vizite/evaluari/livrari.
-   Le putem muta in DB la urmatorul upgrade. */
-let urgente = [];
-let alerte = [];
-let vizite = [];
-let evaluari = [];
-let livrari = [
-  { id: 1, beneficiar: "Pop Maria", status: "Neconfirmata", voluntar: "Ana Pop" }
-];
-
-function nextId(arr) { return arr.length ? Math.max(...arr.map(x => x.id)) + 1 : 1; }
-
 app.get("/api/urgente", async (req, res) => {
-  const db = await getDb();
-  const voluntarId = req.query.voluntarId ? Number(req.query.voluntarId) : null;
+  try {
+    const db = await getDb();
+    const voluntarId = req.query.voluntarId ? Number(req.query.voluntarId) : null;
 
-  const rows = voluntarId
-    ? await db.all(
-        `SELECT u.id, u.mesaj, u.createdAt, v.nume as voluntar
-         FROM urgente u
-         JOIN voluntari v ON v.id = u.voluntarId
-         WHERE u.voluntarId = ?
-         ORDER BY u.id DESC`,
-        [voluntarId]
-      )
-    : await db.all(
-        `SELECT u.id, u.mesaj, u.createdAt, v.nume as voluntar
-         FROM urgente u
-         JOIN voluntari v ON v.id = u.voluntarId
-         ORDER BY u.id DESC`
-      );
-
-  res.json(rows);
+    const sql = `
+      SELECT u.id, u.mesaj, u.createdAt, v.id as voluntarId, v.nume as voluntar
+      FROM urgente u
+      JOIN voluntari v ON v.id = u.voluntarId
+      ${voluntarId ? "WHERE u.voluntarId = ?" : ""}
+      ORDER BY u.id DESC
+    `;
+    const rows = voluntarId ? await db.all(sql, [voluntarId]) : await db.all(sql);
+    res.json(rows);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ message: "Eroare la urgente" });
+  }
 });
 
 app.post("/api/urgente", async (req, res) => {
-  const db = await getDb();
-  const mesaj = cleanText(req.body?.mesaj);
-  const voluntarId = Number(req.body?.voluntarId);
+  try {
+    const mesaj = cleanText(req.body?.mesaj);
+    const voluntarId = Number(req.body?.voluntarId);
+    if (!mesaj) return res.status(400).json({ message: "Mesaj obligatoriu" });
+    if (!voluntarId) return res.status(400).json({ message: "voluntarId obligatoriu" });
 
-  if (!mesaj) return res.status(400).json({ message: "Mesaj obligatoriu" });
-  if (!voluntarId) return res.status(400).json({ message: "voluntarId obligatoriu" });
+    const db = await getDb();
+    const createdAt = nowISO();
+    await db.run("INSERT INTO urgente(mesaj, voluntarId, createdAt) VALUES (?,?,?)", [
+      mesaj,
+      voluntarId,
+      createdAt,
+    ]);
 
-  const v = await db.get("SELECT id FROM voluntari WHERE id = ?", [voluntarId]);
-  if (!v) return res.status(400).json({ message: "Voluntar invalid" });
-
-  const createdAt = new Date().toISOString().slice(0, 19).replace("T", " ");
-  const result = await db.run(
-    "INSERT INTO urgente(mesaj, voluntarId, createdAt) VALUES (?, ?, ?)",
-    [mesaj, voluntarId, createdAt]
-  );
-
-  const row = await db.get(
-    `SELECT u.id, u.mesaj, u.createdAt, v.nume as voluntar
-     FROM urgente u
-     JOIN voluntari v ON v.id = u.voluntarId
-     WHERE u.id = ?`,
-    [result.lastID]
-  );
-
-  res.status(201).json(row);
+    res.status(201).json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ message: "Eroare la trimitere urgenta" });
+  }
 });
 
-app.get("/api/livrari", (req, res) => {
-  res.json(livrari);
+app.get("/api/vizite", async (req, res) => {
+  try {
+    const db = await getDb();
+    const voluntarId = req.query.voluntarId ? Number(req.query.voluntarId) : null;
+
+    const sql = `
+      SELECT z.id, z.data, z.ora, z.createdAt,
+             b.id as beneficiarId, b.nume as beneficiar,
+             v.id as voluntarId, v.nume as voluntar
+      FROM vizite z
+      JOIN beneficiari b ON b.id = z.beneficiarId
+      JOIN voluntari v ON v.id = z.voluntarId
+      ${voluntarId ? "WHERE z.voluntarId = ?" : ""}
+      ORDER BY z.id DESC
+    `;
+    const rows = voluntarId ? await db.all(sql, [voluntarId]) : await db.all(sql);
+    res.json(rows);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ message: "Eroare la vizite" });
+  }
 });
 
-app.post("/api/livrari/:id/confirma", (req, res) => {
-  const id = Number(req.params.id);
-  const item = livrari.find(x => x.id === id);
-  if (!item) return res.status(404).json({ message: "Livrare inexistenta" });
-  item.status = "Confirmata";
-  res.json(item);
+app.post("/api/vizite", async (req, res) => {
+  try {
+    const beneficiarId = Number(req.body?.beneficiarId);
+    const voluntarId = Number(req.body?.voluntarId);
+    const data = cleanText(req.body?.data);
+    const ora = cleanText(req.body?.ora);
+
+    if (!beneficiarId || !voluntarId || !data || !ora) {
+      return res.status(400).json({ message: "Campuri incomplete" });
+    }
+
+    const db = await getDb();
+    const createdAt = nowISO();
+    await db.run(
+      "INSERT INTO vizite(beneficiarId, voluntarId, data, ora, createdAt) VALUES (?,?,?,?,?)",
+      [beneficiarId, voluntarId, data, ora, createdAt]
+    );
+
+    res.status(201).json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ message: "Eroare la programare vizita" });
+  }
 });
 
-app.post("/api/vizite", (req, res) => {
-  const beneficiar = cleanText(req.body?.beneficiar);
-  const date = cleanText(req.body?.date);
-  const time = cleanText(req.body?.time);
-  const voluntar = cleanText(req.body?.voluntar);
-  if (!beneficiar || !date || !time) return res.status(400).json({ message: "Campuri incomplete" });
-  const item = { id: nextId(vizite), beneficiar, date, time, voluntar };
-  vizite.push(item);
-  res.status(201).json(item);
+app.delete("/api/vizite/:id", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const db = await getDb();
+    await db.run("DELETE FROM vizite WHERE id=?", [id]);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ message: "Eroare la stergere vizita" });
+  }
 });
 
-app.get("/api/vizite", (req, res) => {
-  res.json(vizite);
+app.post("/api/evaluari/voluntari", async (req, res) => {
+  try {
+    const voluntarId = Number(req.body?.voluntarId);
+    const scor = Number(req.body?.scor);
+    const observatii = cleanText(req.body?.observatii);
+
+    if (!voluntarId || !scor) return res.status(400).json({ message: "Campuri incomplete" });
+    if (scor < 1 || scor > 10) return res.status(400).json({ message: "Scor 1-10" });
+
+    const db = await getDb();
+    await db.run(
+      "INSERT INTO evaluari_voluntari(voluntarId, scor, observatii, createdAt) VALUES (?,?,?,?)",
+      [voluntarId, scor, observatii, nowISO()]
+    );
+    res.status(201).json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ message: "Eroare la evaluare voluntar" });
+  }
 });
 
-app.post("/api/alerte", (req, res) => {
-  const mesaj = cleanText(req.body?.mesaj);
-  if (!mesaj) return res.status(400).json({ message: "Mesaj obligatoriu" });
-  const item = { id: nextId(alerte), mesaj };
-  alerte.push(item);
-  res.status(201).json(item);
+app.get("/api/evaluari/voluntari", async (req, res) => {
+  try {
+    const db = await getDb();
+    const rows = await db.all(`
+      SELECT e.id, e.scor, e.observatii, e.createdAt,
+             v.id as voluntarId, v.nume as voluntar
+      FROM evaluari_voluntari e
+      JOIN voluntari v ON v.id = e.voluntarId
+      ORDER BY e.id DESC
+    `);
+    res.json(rows);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ message: "Eroare la lista evaluari voluntari" });
+  }
 });
 
-app.get("/api/alerte", (req, res) => {
-  res.json(alerte);
+app.post("/api/evaluari/beneficiari", async (req, res) => {
+  try {
+    const beneficiarId = Number(req.body?.beneficiarId);
+    const voluntarId = Number(req.body?.voluntarId);
+    const scor = Number(req.body?.scor);
+    const observatii = cleanText(req.body?.observatii);
+
+    if (!beneficiarId || !voluntarId || !scor) return res.status(400).json({ message: "Campuri incomplete" });
+    if (scor < 1 || scor > 10) return res.status(400).json({ message: "Scor 1-10" });
+
+    const db = await getDb();
+    await db.run(
+      "INSERT INTO evaluari_beneficiari(beneficiarId, voluntarId, scor, observatii, createdAt) VALUES (?,?,?,?,?)",
+      [beneficiarId, voluntarId, scor, observatii, nowISO()]
+    );
+    res.status(201).json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ message: "Eroare la evaluare beneficiar" });
+  }
 });
 
-app.post("/api/evaluari", (req, res) => {
-  const beneficiar = cleanText(req.body?.beneficiar);
-  const scor = cleanText(req.body?.scor);
-  const observatii = cleanText(req.body?.observatii);
-  if (!beneficiar || !scor) return res.status(400).json({ message: "Beneficiar si scor obligatorii" });
-  const item = { id: nextId(evaluari), beneficiar, scor, observatii };
-  evaluari.push(item);
-  res.status(201).json(item);
-});
+app.get("/api/evaluari/beneficiari", async (req, res) => {
+  try {
+    const db = await getDb();
+    const voluntarId = req.query.voluntarId ? Number(req.query.voluntarId) : null;
 
-app.get("/api/evaluari", (req, res) => {
-  res.json(evaluari);
+    const sql = `
+      SELECT e.id, e.scor, e.observatii, e.createdAt,
+             b.id as beneficiarId, b.nume as beneficiar,
+             v.id as voluntarId, v.nume as voluntar
+      FROM evaluari_beneficiari e
+      JOIN beneficiari b ON b.id = e.beneficiarId
+      JOIN voluntari v ON v.id = e.voluntarId
+      ${voluntarId ? "WHERE e.voluntarId = ?" : ""}
+      ORDER BY e.id DESC
+    `;
+    const rows = voluntarId ? await db.all(sql, [voluntarId]) : await db.all(sql);
+    res.json(rows);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ message: "Eroare la lista evaluari beneficiari" });
+  }
 });
 
 app.listen(PORT, () => {

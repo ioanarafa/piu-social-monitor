@@ -1,109 +1,76 @@
 import { useEffect, useState } from "react";
-import { API } from "../api";
+import { apiGet, apiSend } from "../api";
 
-const CATEGORII = ["Pensionar", "Handicap", "Altele"];
+const CATEG = ["Toate", "Pensionar", "Handicap", "Altele"];
 
 export default function Beneficiari({ showToast, role }) {
-  const [list, setList] = useState([]);
-  const [filtru, setFiltru] = useState("");
+  const [items, setItems] = useState([]);
+  const [filter, setFilter] = useState("Toate");
 
-  // formular admin
   const [nume, setNume] = useState("");
-  const [categorie, setCategorie] = useState(CATEGORII[0]);
+  const [categorie, setCategorie] = useState("Pensionar");
 
-  // edit
   const [editId, setEditId] = useState(null);
   const [editNume, setEditNume] = useState("");
-  const [editCategorie, setEditCategorie] = useState(CATEGORII[0]);
+  const [editCat, setEditCat] = useState("Pensionar");
 
-  async function load(cat = filtru) {
+  async function load() {
     try {
-      const url = cat ? `${API}/beneficiari?categorie=${encodeURIComponent(cat)}` : `${API}/beneficiari`;
-      const res = await fetch(url);
-      const data = await res.json();
-      setList(data);
+      const data = await apiGet("/beneficiari");
+      setItems(data);
     } catch {
       showToast("Eroare: nu pot incarca beneficiarii.", "error");
     }
   }
 
-  useEffect(() => { load(""); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   async function add() {
-    if (!nume.trim()) {
-      showToast("Completeaza numele.", "error");
-      return;
-    }
     try {
-      const res = await fetch(`${API}/beneficiari`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nume, categorie }),
-      });
-      if (!res.ok) {
-        showToast("Eroare la adaugare beneficiar.", "error");
-        return;
-      }
-      showToast("Beneficiar adaugat!", "success");
+      await apiSend("/beneficiari", "POST", { nume, categorie });
       setNume("");
-      setCategorie(CATEGORII[0]);
-      load("");
+      showToast("Beneficiar adaugat!");
+      load();
     } catch {
-      showToast("Backend indisponibil.", "error");
-    }
-  }
-
-  function startEdit(b) {
-    setEditId(b.id);
-    setEditNume(b.nume);
-    setEditCategorie(b.categorie);
-  }
-
-  async function saveEdit() {
-    try {
-      const res = await fetch(`${API}/beneficiari/${editId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nume: editNume, categorie: editCategorie }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        showToast(err.message || "Eroare la editare.", "error");
-        return;
-      }
-      showToast("Beneficiar actualizat!", "success");
-      setEditId(null);
-      load("");
-    } catch {
-      showToast("Backend indisponibil.", "error");
+      showToast("Eroare la adaugare.", "error");
     }
   }
 
   async function del(id) {
-    if (!confirm("Stergi beneficiarul?")) return;
     try {
-      const res = await fetch(`${API}/beneficiari/${id}`, { method: "DELETE" });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        showToast(err.message || "Nu pot sterge beneficiarul.", "error");
-        return;
-      }
-      showToast("Beneficiar sters.", "success");
-      load("");
+      await apiSend(`/beneficiari/${id}`, "DELETE");
+      showToast("Beneficiar sters!");
+      load();
     } catch {
-      showToast("Backend indisponibil.", "error");
+      showToast("Eroare la stergere (poate are interventii).", "error");
     }
   }
 
+  async function saveEdit() {
+    try {
+      await apiSend(`/beneficiari/${editId}`, "PUT", { nume: editNume, categorie: editCat });
+      setEditId(null);
+      showToast("Beneficiar editat!");
+      load();
+    } catch {
+      showToast("Eroare la editare.", "error");
+    }
+  }
+
+  const shown = items.filter((x) => filter === "Toate" || x.categorie === filter);
+
   return (
-    <>
+    <div>
       <h1>Beneficiari</h1>
 
       <div className="card">
         <label>Filtru categorie</label>
-        <select value={filtru} onChange={(e) => { setFiltru(e.target.value); load(e.target.value); }}>
-          <option value="">Toate</option>
-          {CATEGORII.map((c) => <option key={c} value={c}>{c}</option>)}
+        <select value={filter} onChange={(e) => setFilter(e.target.value)}>
+          {CATEG.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
         </select>
       </div>
 
@@ -115,7 +82,9 @@ export default function Beneficiari({ showToast, role }) {
 
           <label>Categorie</label>
           <select value={categorie} onChange={(e) => setCategorie(e.target.value)}>
-            {CATEGORII.map((c) => <option key={c} value={c}>{c}</option>)}
+            {CATEG.filter((x) => x !== "Toate").map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
           </select>
 
           <button className="button" onClick={add}>Adauga</button>
@@ -123,38 +92,59 @@ export default function Beneficiari({ showToast, role }) {
       )}
 
       <div className="list">
-      {list.map((b) => (
-        <div key={b.id} className="card">
-          {editId === b.id ? (
-            <>
-              <label>Nume</label>
-              <input value={editNume} onChange={(e) => setEditNume(e.target.value)} />
-              <label>Categorie</label>
-              <select value={editCategorie} onChange={(e) => setEditCategorie(e.target.value)}>
-                {CATEGORII.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
+        {shown.map((b) => (
+          <div className="card" key={b.id}>
+            {editId === b.id ? (
+              <>
+                <label>Nume</label>
+                <input value={editNume} onChange={(e) => setEditNume(e.target.value)} />
+                <label>Categorie</label>
+                <select value={editCat} onChange={(e) => setEditCat(e.target.value)}>
+                  {CATEG.filter((x) => x !== "Toate").map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
 
-              <div className="row">
                 <button className="button" onClick={saveEdit}>Salveaza</button>
-                <button className="button" onClick={() => setEditId(null)}>Renunta</button>
-              </div>
-            </>
-          ) : (
-            <>
-              <p><b>{b.nume}</b></p>
-              <p>Categorie: {b.categorie}</p>
+                <button
+                  className="button"
+                  style={{ marginLeft: 10, background: "#95a5a6" }}
+                  onClick={() => setEditId(null)}
+                >
+                  Renunta
+                </button>
+              </>
+            ) : (
+              <>
+                <h3>{b.nume}</h3>
+                <div>Categorie: {b.categorie}</div>
 
-              {role === "admin" && (
-                <div className="row">
-                  <button className="button" onClick={() => startEdit(b)}>Editeaza</button>
-                  <button className="button danger" onClick={() => del(b.id)}>Sterge</button>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      ))}
+                {role === "admin" && (
+                  <div style={{ marginTop: 10 }}>
+                    <button
+                      className="button"
+                      onClick={() => {
+                        setEditId(b.id);
+                        setEditNume(b.nume);
+                        setEditCat(b.categorie);
+                      }}
+                    >
+                      Editeaza
+                    </button>
+                    <button
+                      className="button"
+                      style={{ marginLeft: 10, background: "#e74c3c" }}
+                      onClick={() => del(b.id)}
+                    >
+                      Sterge
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        ))}
       </div>
-    </>
+    </div>
   );
 }
