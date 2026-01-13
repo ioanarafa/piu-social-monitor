@@ -99,6 +99,7 @@ export default function Voluntari({ showToast, refreshVoluntari }) {
         <button className="button" onClick={add}>Adauga</button>
       </div>
 
+      <div className="list">
       {list.map((v) => (
         <div key={v.id} className="card">
           {editId === v.id ? (
@@ -121,6 +122,7 @@ export default function Voluntari({ showToast, refreshVoluntari }) {
           )}
         </div>
       ))}
+      </div>
     </>
   );
 }

@@ -1,12 +1,32 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { API } from "../api";
 
-export default function Urgenta({ showToast }) {
+export default function Urgenta({ showToast, role, voluntarId }) {
   const [text, setText] = useState("");
+  const [list, setList] = useState([]);
+
+  async function load() {
+    try {
+      const url =
+        role === "voluntar" && voluntarId
+          ? `${API}/urgente?voluntarId=${voluntarId}`
+          : `${API}/urgente`;
+
+      const res = await fetch(url);
+      const data = await res.json();
+      setList(data);
+    } catch {
+      showToast("Eroare: nu pot incarca urgentele.", "error");
+    }
+  }
 
   async function send() {
     if (!text.trim()) {
       showToast("Completeaza descrierea!", "error");
+      return;
+    }
+    if (!voluntarId) {
+      showToast("Selecteaza voluntarul!", "error");
       return;
     }
 
@@ -14,35 +34,67 @@ export default function Urgenta({ showToast }) {
       const res = await fetch(`${API}/urgente`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ descriere: text }),
+        body: JSON.stringify({ mesaj: text, voluntarId }),
       });
 
       if (!res.ok) {
-        showToast("Eroare la trimitere raport.", "error");
+        showToast("Eroare la trimitere urgenta.", "error");
         return;
       }
 
-      showToast("Raport trimis cu succes!", "success");
+      showToast("Urgenta trimisa catre admin!", "success");
       setText("");
+      load();
     } catch {
-      showToast("Eroare: backend indisponibil.", "error");
+      showToast("Backend indisponibil.", "error");
     }
   }
 
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role, voluntarId]);
+
   return (
     <>
-      <h1>Raportare urgenta</h1>
+      <h1>Urgenta</h1>
 
-      <div className="card">
-        <label>Descriere situatie</label>
-        <textarea
-          placeholder="Descriere situatie"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-        />
-        <button className="button" onClick={send}>
-          Trimite raport
-        </button>
+      {role === "voluntar" ? (
+        <div className="card">
+          <label>Raportare urgenta</label>
+          <textarea
+            placeholder="Descriere situatie urgenta..."
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+          />
+          <button className="button" onClick={send}>
+            Trimite
+          </button>
+          <p className="hint">
+            Adminul va vedea toate urgentele trimise de voluntari.
+          </p>
+        </div>
+      ) : (
+        <div className="card">
+          <p className="hint">
+            (Admin) Aici vezi toate urgentele raportate de voluntari.
+          </p>
+        </div>
+      )}
+
+      <div className="list">
+        {list.length === 0 ? (
+          <p>Nicio urgenta inregistrata.</p>
+        ) : (
+          list.map((u) => (
+            <div key={u.id} className="card">
+              <p>
+                <b>{u.voluntar || "Voluntar"}</b> • {u.createdAt}
+              </p>
+              <p>{u.mesaj}</p>
+            </div>
+          ))
+        )}
       </div>
     </>
   );

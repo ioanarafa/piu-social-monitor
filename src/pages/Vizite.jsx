@@ -2,84 +2,85 @@ import { useEffect, useState } from "react";
 import { API } from "../api";
 
 export default function Vizite({ showToast, role, voluntar }) {
-  const [beneficiar, setBeneficiar] = useState("");
-  const [date, setDate] = useState("");
-  const [time, setTime] = useState("");
-  const [list, setList] = useState([]);
+  const [interventii, setInterventii] = useState([]);
+  const [selected, setSelected] = useState("");
+  const [data, setData] = useState("");
+  const [ora, setOra] = useState("");
 
   async function load() {
-    try {
-      const res = await fetch(`${API}/vizite`);
-      const data = await res.json();
-      setList(data);
-    } catch {
-      showToast("Eroare: nu pot incarca vizitele.", "error");
-    }
+    const res = await fetch(`${API}/interventii`);
+    const data = await res.json();
+
+    const vizite = data.filter((i) => i.tip === "Vizita");
+
+    const visible =
+      role === "voluntar"
+        ? vizite.filter((i) => i.voluntar === voluntar)
+        : vizite;
+
+    setInterventii(visible);
   }
 
   async function save() {
-    if (!beneficiar || !date || !time) {
+    if (!selected || !data || !ora) {
       showToast("Completeaza toate campurile!", "error");
       return;
     }
 
-    try {
-      const res = await fetch(`${API}/vizite`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ beneficiar, date, time, voluntar }),
-      });
+    await fetch(`${API}/interventii/${selected}/vizita`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dataVizita: data, oraVizita: ora }),
+    });
 
-      if (!res.ok) {
-        showToast("Eroare la salvare vizita.", "error");
-        return;
-      }
-
-      showToast("Vizita salvata!", "success");
-      setBeneficiar("");
-      setDate("");
-      setTime("");
-      load();
-    } catch {
-      showToast("Backend indisponibil.", "error");
-    }
+    showToast("Vizita programata!", "success");
+    setSelected("");
+    setData("");
+    setOra("");
+    load();
   }
 
   useEffect(() => {
     load();
-  }, []);
-
-  const visible =
-    role === "voluntar"
-      ? list.filter((v) => v.voluntar === voluntar)
-      : list;
+  }, [role, voluntar]);
 
   return (
     <>
       <h1>Programare vizite</h1>
 
       <div className="card">
-        <label>Beneficiar</label>
-        <input value={beneficiar} onChange={(e) => setBeneficiar(e.target.value)} />
+        <label>Interventie (Vizita)</label>
+        <select value={selected} onChange={(e) => setSelected(e.target.value)}>
+          <option value="">-- selecteaza --</option>
+          {interventii.map((i) => (
+            <option key={i.id} value={i.id}>
+              #{i.id} - {i.beneficiar} ({i.voluntar || "neatribuita"})
+            </option>
+          ))}
+        </select>
 
         <label>Data</label>
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        <input type="date" value={data} onChange={(e) => setData(e.target.value)} />
 
         <label>Ora</label>
-        <input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+        <input type="time" value={ora} onChange={(e) => setOra(e.target.value)} />
 
         <button className="button" onClick={save}>
           Salveaza
         </button>
       </div>
 
-      {visible.map((v) => (
-        <div key={v.id} className="card">
-          <p><b>{v.beneficiar}</b></p>
-          <p>{v.date} - {v.time}</p>
-          <p>Voluntar: {v.voluntar}</p>
-        </div>
-      ))}
+      <div className="list">
+        {interventii
+          .filter((i) => i.dataVizita)
+          .map((i) => (
+            <div key={i.id} className="card">
+              <b>{i.beneficiar}</b>
+              <p>{i.dataVizita} – {i.oraVizita}</p>
+              <p>Voluntar: {i.voluntar || "-"}</p>
+            </div>
+          ))}
+      </div>
     </>
   );
 }

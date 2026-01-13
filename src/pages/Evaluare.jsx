@@ -72,6 +72,7 @@ export default function Evaluare({ showToast }) {
         </button>
       </div>
 
+      <div className="list">
       {list.map((e) => (
         <div key={e.id} className="card">
           <p>
@@ -80,6 +81,7 @@ export default function Evaluare({ showToast }) {
           <p>{e.observatii}</p>
         </div>
       ))}
+      </div>
     </>
   );
 }

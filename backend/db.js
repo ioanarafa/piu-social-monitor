@@ -34,9 +34,21 @@ export async function getDb() {
       beneficiarId INTEGER NOT NULL,
       voluntarId INTEGER,
       createdAt TEXT NOT NULL,
+      dataVizita TEXT,
+      oraVizita TEXT,
       FOREIGN KEY(beneficiarId) REFERENCES beneficiari(id) ON DELETE RESTRICT,
       FOREIGN KEY(voluntarId) REFERENCES voluntari(id) ON DELETE SET NULL
     );
+
+
+    CREATE TABLE IF NOT EXISTS urgente (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      mesaj TEXT NOT NULL,
+      voluntarId INTEGER NOT NULL,
+      createdAt TEXT NOT NULL,
+      FOREIGN KEY(voluntarId) REFERENCES voluntari(id) ON DELETE CASCADE
+    );
+
   `);
 
   // seed minim (doar daca sunt goale)

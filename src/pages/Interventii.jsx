@@ -129,6 +129,7 @@ export default function Interventii({ showToast, role, voluntarId }) {
         </div>
       )}
 
+      <div className="list">
       {visible.map((i) => (
         <div key={i.id} className="card">
           <p><b>#{i.id} - {i.tip}</b></p>
@@ -147,6 +148,7 @@ export default function Interventii({ showToast, role, voluntarId }) {
           )}
         </div>
       ))}
+      </div>
 
       {role === "voluntar" && visible.length === 0 && (
         <p>Nu ai interventii atribuite.</p>

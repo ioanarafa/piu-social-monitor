@@ -1,19 +1,23 @@
 body {
   margin: 0;
+   overflow: hidden;
   font-family: Arial, sans-serif;
 }
 
 .app {
   display: flex;
   height: 100vh;
+  overflow: hidden; 
 }
 
-/* MENIU */
 .sidebar {
   width: 230px;
   background: #2c3e50;
   color: white;
   padding: 20px;
+  height: 100vh;
+  overflow-y: auto; 
+  flex-shrink: 0;
 }
 
 .sidebar h2 {
@@ -34,17 +38,17 @@ body {
   background: #1abc9c;
 }
 
-/* BUTON ACTIV (pagina curenta) */
 .navBtn.active {
   background: #16c39a;
   font-weight: 700;
 }
 
-/* CONTINUT */
 .content {
   flex: 1;
-  padding: 20px;
   background: #ecf0f1;
+  padding: 20px;
+  height: 100vh;
+  overflow-y: auto;
 }
 
 .card {
@@ -72,7 +76,6 @@ input, textarea, select {
   padding: 6px;
 }
 
-/* TOAST (feedback) */
 .toast {
   padding: 12px 14px;
   border-radius: 8px;
@@ -113,7 +116,6 @@ input, textarea, select {
 }
 
 
-/* small helpers */
 .row{
   display:flex;
   gap:10px;
@@ -130,5 +132,18 @@ input, textarea, select {
 
 .hint{
   font-size: 13px;
+  opacity: 0.8;
+}
+
+
+.list {
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.hint {
+  margin: 8px 0 0;
+  font-size: 12px;
   opacity: 0.8;
 }

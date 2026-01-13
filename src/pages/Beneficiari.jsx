@@ -122,6 +122,7 @@ export default function Beneficiari({ showToast, role }) {
         </div>
       )}
 
+      <div className="list">
       {list.map((b) => (
         <div key={b.id} className="card">
           {editId === b.id ? (
@@ -153,6 +154,7 @@ export default function Beneficiari({ showToast, role }) {
           )}
         </div>
       ))}
+      </div>
     </>
   );
 }

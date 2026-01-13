@@ -4,19 +4,17 @@ import Interventii from "./pages/Interventii";
 import Beneficiari from "./pages/Beneficiari";
 import Voluntari from "./pages/Voluntari";
 import Urgenta from "./pages/Urgenta";
-import Livrari from "./pages/Livrari";
 import Atribuire from "./pages/Atribuire";
 import Vizite from "./pages/Vizite";
-import Alerte from "./pages/Alerte";
 import Evaluare from "./pages/Evaluare";
 import { API } from "./api";
 
 function App() {
-  const [role, setRole] = useState("admin"); // admin | voluntar
+  const [role, setRole] = useState("admin"); 
   const [page, setPage] = useState("interventii");
 
   const [voluntari, setVoluntari] = useState([]);
-  const [voluntarId, setVoluntarId] = useState(null); // pentru rol voluntar
+  const [voluntarId, setVoluntarId] = useState(null); 
 
   const [toast, setToast] = useState({ text: "", type: "" });
 
@@ -45,7 +43,6 @@ function App() {
 
   useEffect(() => {
     loadVoluntari();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function changeRole(newRole) {
@@ -121,16 +118,10 @@ function App() {
         <button className={navClass("urgenta")} onClick={() => setPage("urgenta")}>
           Urgenta
         </button>
-        <button className={navClass("livrari")} onClick={() => setPage("livrari")}>
-          Confirmare livrare
-        </button>
-        <button className={navClass("vizite")} onClick={() => setPage("vizite")}>
+<button className={navClass("vizite")} onClick={() => setPage("vizite")}>
           Programare vizite
         </button>
-        <button className={navClass("alerte")} onClick={() => setPage("alerte")}>
-          Alerte
-        </button>
-        <button className={navClass("evaluare")} onClick={() => setPage("evaluare")}>
+<button className={navClass("evaluare")} onClick={() => setPage("evaluare")}>
           Evaluare progres
         </button>
       </div>
@@ -156,10 +147,14 @@ function App() {
           <Atribuire showToast={showToast} />
         )}
 
-        {page === "urgenta" && <Urgenta showToast={showToast} />}
-        {page === "livrari" && <Livrari showToast={showToast} role={role} voluntar={voluntari.find(v=>v.id===voluntarId)?.nume || ""} />}
+        {page === "urgenta" && (
+          <Urgenta
+            showToast={showToast}
+            role={role}
+            voluntarId={voluntarId}
+          />
+        )}
         {page === "vizite" && <Vizite showToast={showToast} role={role} voluntar={voluntari.find(v=>v.id===voluntarId)?.nume || ""} />}
-        {page === "alerte" && <Alerte showToast={showToast} />}
         {page === "evaluare" && <Evaluare showToast={showToast} />}
       </div>
     </div>

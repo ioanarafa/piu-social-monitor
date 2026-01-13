@@ -148,7 +148,25 @@ app.patch("/api/interventii/:id/status", async (req, res) => {
   res.json({ ok: true });
 });
 
-// admin: sterge interventie
+app.patch("/api/interventii/:id/vizita", async (req, res) => {
+  const id = Number(req.params.id);
+  const dataVizita = cleanText(req.body?.dataVizita);
+  const oraVizita = cleanText(req.body?.oraVizita);
+
+  if (!id || !dataVizita || !oraVizita) {
+    return res.status(400).json({ message: "Date invalide" });
+  }
+
+  const db = await getDb();
+  await db.run(
+    "UPDATE interventii SET dataVizita=?, oraVizita=? WHERE id=?",
+    [dataVizita, oraVizita, id]
+  );
+
+  res.json({ ok: true });
+});
+
+
 app.delete("/api/interventii/:id", async (req, res) => {
   const id = Number(req.params.id);
   if (!id) return res.status(400).json({ message: "ID invalid" });
@@ -158,7 +176,7 @@ app.delete("/api/interventii/:id", async (req, res) => {
   res.json({ ok: true });
 });
 
-/* -------------------- ATRIBUIRE (Admin) -------------------- */
+
 app.post("/api/atribuiri", async (req, res) => {
   const interventieId = Number(req.body?.interventieId);
   const voluntarId = Number(req.body?.voluntarId);
@@ -185,12 +203,55 @@ let livrari = [
 
 function nextId(arr) { return arr.length ? Math.max(...arr.map(x => x.id)) + 1 : 1; }
 
-app.post("/api/urgente", (req, res) => {
-  const descriere = cleanText(req.body?.descriere);
-  if (!descriere) return res.status(400).json({ message: "Descriere obligatorie" });
-  const item = { id: nextId(urgente), descriere };
-  urgente.push(item);
-  res.status(201).json(item);
+app.get("/api/urgente", async (req, res) => {
+  const db = await getDb();
+  const voluntarId = req.query.voluntarId ? Number(req.query.voluntarId) : null;
+
+  const rows = voluntarId
+    ? await db.all(
+        `SELECT u.id, u.mesaj, u.createdAt, v.nume as voluntar
+         FROM urgente u
+         JOIN voluntari v ON v.id = u.voluntarId
+         WHERE u.voluntarId = ?
+         ORDER BY u.id DESC`,
+        [voluntarId]
+      )
+    : await db.all(
+        `SELECT u.id, u.mesaj, u.createdAt, v.nume as voluntar
+         FROM urgente u
+         JOIN voluntari v ON v.id = u.voluntarId
+         ORDER BY u.id DESC`
+      );
+
+  res.json(rows);
+});
+
+app.post("/api/urgente", async (req, res) => {
+  const db = await getDb();
+  const mesaj = cleanText(req.body?.mesaj);
+  const voluntarId = Number(req.body?.voluntarId);
+
+  if (!mesaj) return res.status(400).json({ message: "Mesaj obligatoriu" });
+  if (!voluntarId) return res.status(400).json({ message: "voluntarId obligatoriu" });
+
+  const v = await db.get("SELECT id FROM voluntari WHERE id = ?", [voluntarId]);
+  if (!v) return res.status(400).json({ message: "Voluntar invalid" });
+
+  const createdAt = new Date().toISOString().slice(0, 19).replace("T", " ");
+  const result = await db.run(
+    "INSERT INTO urgente(mesaj, voluntarId, createdAt) VALUES (?, ?, ?)",
+    [mesaj, voluntarId, createdAt]
+  );
+
+  const row = await db.get(
+    `SELECT u.id, u.mesaj, u.createdAt, v.nume as voluntar
+     FROM urgente u
+     JOIN voluntari v ON v.id = u.voluntarId
+     WHERE u.id = ?`,
+    [result.lastID]
+  );
+
+  res.status(201).json(row);
 });
 
 app.get("/api/livrari", (req, res) => {
