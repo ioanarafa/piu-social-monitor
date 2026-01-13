@@ -1,18 +1,22 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import Interventii from "./pages/Interventii";
 import Beneficiari from "./pages/Beneficiari";
+import Voluntari from "./pages/Voluntari";
 import Urgenta from "./pages/Urgenta";
 import Livrari from "./pages/Livrari";
 import Atribuire from "./pages/Atribuire";
 import Vizite from "./pages/Vizite";
 import Alerte from "./pages/Alerte";
 import Evaluare from "./pages/Evaluare";
+import { API } from "./api";
 
 function App() {
-  const [role, setRole] = useState("admin");        // admin | voluntar
-  const [voluntar, setVoluntar] = useState("Ana Pop"); // Ana Pop | Mihai Rusu
+  const [role, setRole] = useState("admin"); // admin | voluntar
   const [page, setPage] = useState("interventii");
+
+  const [voluntari, setVoluntari] = useState([]);
+  const [voluntarId, setVoluntarId] = useState(null); // pentru rol voluntar
 
   const [toast, setToast] = useState({ text: "", type: "" });
 
@@ -25,22 +29,38 @@ function App() {
     return page === p ? "navBtn active" : "navBtn";
   }
 
+  async function loadVoluntari() {
+    try {
+      const res = await fetch(`${API}/voluntari`);
+      const data = await res.json();
+      setVoluntari(data);
+
+      if (!voluntarId && data.length) {
+        setVoluntarId(data[0].id);
+      }
+    } catch {
+      showToast("Eroare: nu pot incarca voluntarii.", "error");
+    }
+  }
+
+  useEffect(() => {
+    loadVoluntari();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function changeRole(newRole) {
     setRole(newRole);
 
-    // daca devii voluntar, te duce pe interventii si iti selecteaza automat un voluntar
     if (newRole === "voluntar") {
-      setVoluntar("Ana Pop");
       setPage("interventii");
-      showToast("Rol: Voluntar (Ana Pop)", "success");
+      if (!voluntarId && voluntari.length) setVoluntarId(voluntari[0].id);
+      showToast("Rol: Voluntar", "success");
     } else {
       showToast("Rol: Admin", "success");
     }
 
-    // daca erai pe Atribuire si treci pe voluntar, nu ai voie acolo
-    if (newRole === "voluntar" && page === "atribuire") {
-      setPage("interventii");
-    }
+    if (newRole === "voluntar" && page === "atribuire") setPage("interventii");
+    if (newRole === "voluntar" && page === "voluntari") setPage("interventii");
   }
 
   return (
@@ -61,20 +81,20 @@ function App() {
           </select>
         </div>
 
-        {/* VOLUNTAR (apare doar pe rol voluntar) */}
+        {/* SELECT VOLUNTAR (doar pe rol voluntar) */}
         {role === "voluntar" && (
           <div className="roleBox">
             <label className="roleLabel">Voluntar</label>
             <select
               className="roleSelect"
-              value={voluntar}
-              onChange={(e) => {
-                setVoluntar(e.target.value);
-                showToast(`Voluntar: ${e.target.value}`, "success");
-              }}
+              value={voluntarId ?? ""}
+              onChange={(e) => setVoluntarId(Number(e.target.value))}
             >
-              <option value="Ana Pop">Ana Pop</option>
-              <option value="Mihai Rusu">Mihai Rusu</option>
+              {voluntari.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.nume}
+                </option>
+              ))}
             </select>
           </div>
         )}
@@ -85,20 +105,25 @@ function App() {
         <button className={navClass("beneficiari")} onClick={() => setPage("beneficiari")}>
           Beneficiari
         </button>
+
+        {/* Admin only: Voluntari + Atribuire */}
+        {role === "admin" && (
+          <>
+            <button className={navClass("voluntari")} onClick={() => setPage("voluntari")}>
+              Voluntari
+            </button>
+            <button className={navClass("atribuire")} onClick={() => setPage("atribuire")}>
+              Atribuire cazuri
+            </button>
+          </>
+        )}
+
         <button className={navClass("urgenta")} onClick={() => setPage("urgenta")}>
           Urgenta
         </button>
         <button className={navClass("livrari")} onClick={() => setPage("livrari")}>
           Confirmare livrare
         </button>
-
-        {/* DOAR ADMIN */}
-        {role === "admin" && (
-          <button className={navClass("atribuire")} onClick={() => setPage("atribuire")}>
-            Atribuire cazuri
-          </button>
-        )}
-
         <button className={navClass("vizite")} onClick={() => setPage("vizite")}>
           Programare vizite
         </button>
@@ -114,29 +139,28 @@ function App() {
         {toast.text && <div className={`toast ${toast.type}`}>{toast.text}</div>}
 
         {page === "interventii" && (
-          <Interventii showToast={showToast} role={role} voluntar={voluntar} />
+          <Interventii
+            showToast={showToast}
+            role={role}
+            voluntarId={voluntarId}
+            refreshVoluntari={loadVoluntari}
+          />
         )}
         {page === "beneficiari" && (
-          <Beneficiari showToast={showToast} role={role} voluntar={voluntar} />
+          <Beneficiari showToast={showToast} role={role} />
         )}
-        {page === "urgenta" && (
-          <Urgenta showToast={showToast} role={role} voluntar={voluntar} />
-        )}
-        {page === "livrari" && (
-          <Livrari showToast={showToast} role={role} voluntar={voluntar} />
+        {page === "voluntari" && role === "admin" && (
+          <Voluntari showToast={showToast} refreshVoluntari={loadVoluntari} />
         )}
         {page === "atribuire" && role === "admin" && (
-          <Atribuire showToast={showToast} role={role} voluntar={voluntar} />
+          <Atribuire showToast={showToast} />
         )}
-        {page === "vizite" && (
-          <Vizite showToast={showToast} role={role} voluntar={voluntar} />
-        )}
-        {page === "alerte" && (
-          <Alerte showToast={showToast} role={role} voluntar={voluntar} />
-        )}
-        {page === "evaluare" && (
-          <Evaluare showToast={showToast} role={role} voluntar={voluntar} />
-        )}
+
+        {page === "urgenta" && <Urgenta showToast={showToast} />}
+        {page === "livrari" && <Livrari showToast={showToast} role={role} voluntar={voluntari.find(v=>v.id===voluntarId)?.nume || ""} />}
+        {page === "vizite" && <Vizite showToast={showToast} role={role} voluntar={voluntari.find(v=>v.id===voluntarId)?.nume || ""} />}
+        {page === "alerte" && <Alerte showToast={showToast} />}
+        {page === "evaluare" && <Evaluare showToast={showToast} />}
       </div>
     </div>
   );

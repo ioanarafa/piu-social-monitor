@@ -4,35 +4,47 @@ import { API } from "../api";
 export default function Atribuire({ showToast }) {
   const [interventii, setInterventii] = useState([]);
   const [voluntari, setVoluntari] = useState([]);
+
   const [interventieId, setInterventieId] = useState("");
-  const [voluntar, setVoluntar] = useState("");
+  const [voluntarId, setVoluntarId] = useState("");
 
   async function load() {
     try {
       const r1 = await fetch(`${API}/interventii`);
       const i = await r1.json();
       setInterventii(i);
-      if (i.length) setInterventieId(i[0].id);
+
+      // default: prima interventie neatribuita, altfel prima
+      const ne = i.find((x) => !x.voluntarId);
+      setInterventieId(String((ne || i[0] || {}).id || ""));
 
       const r2 = await fetch(`${API}/voluntari`);
       const v = await r2.json();
       setVoluntari(v);
-      if (v.length) setVoluntar(v[0].nume);
+      setVoluntarId(String((v[0] || {}).id || ""));
     } catch {
       showToast("Eroare la incarcare date.", "error");
     }
   }
 
+  useEffect(() => { load(); }, []);
+
   async function assign() {
+    if (!interventieId || !voluntarId) {
+      showToast("Alege interventie si voluntar.", "error");
+      return;
+    }
+
     try {
       const res = await fetch(`${API}/atribuiri`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ interventieId, voluntar }),
+        body: JSON.stringify({ interventieId: Number(interventieId), voluntarId: Number(voluntarId) }),
       });
 
       if (!res.ok) {
-        showToast("Eroare la atribuire.", "error");
+        const err = await res.json().catch(() => ({}));
+        showToast(err.message || "Eroare la atribuire.", "error");
         return;
       }
 
@@ -43,10 +55,6 @@ export default function Atribuire({ showToast }) {
     }
   }
 
-  useEffect(() => {
-    load();
-  }, []);
-
   return (
     <>
       <h1>Atribuire cazuri</h1>
@@ -56,22 +64,24 @@ export default function Atribuire({ showToast }) {
         <select value={interventieId} onChange={(e) => setInterventieId(e.target.value)}>
           {interventii.map((i) => (
             <option key={i.id} value={i.id}>
-              #{i.id} - {i.titlu} ({i.beneficiar}) | {i.voluntar || "neatribuit"}
+              #{i.id} - {i.tip} ({i.beneficiar}) | {i.voluntar ? i.voluntar : "neatribuit"}
             </option>
           ))}
         </select>
 
         <label>Voluntar</label>
-        <select value={voluntar} onChange={(e) => setVoluntar(e.target.value)}>
+        <select value={voluntarId} onChange={(e) => setVoluntarId(e.target.value)}>
           {voluntari.map((v) => (
-            <option key={v.id} value={v.nume}>{v.nume}</option>
+            <option key={v.id} value={v.id}>{v.nume}</option>
           ))}
         </select>
 
-        <button className="button" onClick={assign}>
-          Asigneaza
-        </button>
+        <button className="button" onClick={assign}>Asigneaza</button>
       </div>
+
+      <p className="hint">
+        Tip: creeaza interventii in pagina <b>Interventii</b>, apoi vino aici sa le atribui.
+      </p>
     </>
   );
 }
